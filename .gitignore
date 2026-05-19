@@ -8,3 +8,4 @@ build/
 recordings/
 models/
 *.log
+*.zip
