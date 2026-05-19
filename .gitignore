@@ -10,4 +10,8 @@ models/
 *.log
 *.zip
 settings.json
-VoiceMonitor.spec
+vm_settings.json
+monitor.log
+cs/VoiceMonitor/obj/
+cs/VoiceMonitor/bin/
+cs/VoiceMonitor/*.csproj.user
