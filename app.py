@@ -3,208 +3,124 @@ import sys
 import json
 import threading
 import wave
-import logging
 from datetime import datetime
-from pathlib import Path
+import glob
+import urllib.request
+import zipfile
+import shutil
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import pystray
-from PIL import Image, ImageDraw
 
-from pyaudio import PyAudio, paInt16
-from vosk import Model, KaldiRecognizer
-
-from profanity_detector import detect_profanity
-from profanity_list import PROFANITY_WORDS
-
-try:
-    import urllib.request
-    import zipfile
-    HAS_DOWNLOAD = True
-except ImportError:
-    HAS_DOWNLOAD = False
-
-
-def resource_path(relative):
-    if getattr(sys, 'frozen', False):
-        base = sys._MEIPASS
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, relative)
-
+# --- Профильтрованный список слов ---
+DEFAULT_WORDS = [
+    "блять", "блядь", "бля", "сука", "хуй", "хуя", "хуе", "пизд", "пиздец",
+    "ебат", "ебан", "ебать", "нахуй", "похуй", "заеб", "уеб", "отъеб",
+    "долбоёб", "долбоеб", "мудак", "мудила", "залуп", "шлюх", "пидор",
+    "еблан", "дебил", "чмо", "лох", "гандон", "гондон", "говно", "жопа"
+]
 
 SETTINGS_FILE = "vm_settings.json"
-DEFAULT_SETTINGS = {
-    "recordings_dir": "",
-    "profanity_words": PROFANITY_WORDS,
-    "post_record_seconds": 3,
-    "setup_complete": False,
-}
+MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"
 
 
-def load_settings():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SETTINGS_FILE)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return DEFAULT_SETTINGS.copy()
-
-
-def save_settings(settings):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SETTINGS_FILE)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(settings, f, indent=2, ensure_ascii=False)
+def get_base():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def get_model_dir():
-    base = os.path.dirname(os.path.abspath(__file__))
-    if getattr(sys, 'frozen', False):
-        return os.path.join(base, "model")
-    return os.path.join(base, "models", "vosk-model-small-ru-0.22")
+    return os.path.join(get_base(), "model")
 
 
-class SettingsDialog:
-    def __init__(self, parent, settings):
+def load_settings():
+    p = os.path.join(get_base(), SETTINGS_FILE)
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+def save_settings(s):
+    p = os.path.join(get_base(), SETTINGS_FILE)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(s, f, indent=2, ensure_ascii=False)
+
+
+def get_rec_dir(settings):
+    d = settings.get("rec_dir", "")
+    if not d:
+        d = os.path.join(get_base(), "recordings")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def has_profane(text, words):
+    t = text.lower()
+    for w in words:
+        if w in t:
+            return True
+    return False
+
+
+class SetupWindow(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("VoiceMonitor — Настройка")
+        self.geometry("480x340")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
         self.result = None
-        self.settings = settings.copy()
-        self.settings.setdefault("profanity_words", PROFANITY_WORDS)
-        self.settings.setdefault("post_record_seconds", 3)
 
-        self.win = tk.Toplevel(parent)
-        self.win.title("Настройки")
-        self.win.geometry("480x520")
-        self.win.resizable(False, False)
-        self.win.transient(parent)
-        self.win.grab_set()
-
-        bg = "#1e1e2e"
-        fg = "#ffffff"
-        accent = "#6c5ce7"
-        self.win.configure(bg=bg)
+        bg = "#1a1a2e"
+        self.configure(bg=bg)
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("TLabel", background=bg, foreground=fg, font=("Segoe UI", 10))
-        style.configure("TButton", font=("Segoe UI", 10), padding=(16, 6))
-        style.configure("Accent.TButton", background=accent, foreground="white", font=("Segoe UI", 10, "bold"))
-        style.configure("Header.TLabel", background=bg, foreground="#a29bfe", font=("Segoe UI", 13, "bold"))
+        style.configure("TLabel", background=bg, foreground="#ffffff", font=("Segoe UI", 10))
+        style.configure("Title.TLabel", background=bg, foreground="#a29bfe", font=("Segoe UI", 13, "bold"))
+        style.configure("TButton", font=("Segoe UI", 10), padding=(16, 5))
+        style.configure("Accent.TButton", background="#6c5ce7", foreground="#ffffff", font=("Segoe UI", 10, "bold"))
 
-        pady = 12
-        padx = 24
-
-        ttk.Label(self.win, text="Настройки", style="Header.TLabel").pack(anchor="w", padx=padx, pady=(20, 4))
-        ttk.Label(self.win, text="Папка для записей:").pack(anchor="w", padx=padx, pady=(pady, 2))
-
-        dir_frame = ttk.Frame(self.win)
-        dir_frame.pack(fill="x", padx=padx)
-
-        self.dir_var = tk.StringVar(value=self.settings.get("recordings_dir", ""))
-        ttk.Entry(dir_frame, textvariable=self.dir_var, width=35).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ttk.Button(dir_frame, text="Обзор...", command=self.browse_dir).pack(side="right")
-
-        ttk.Label(self.win, text="Запись после детекции (сек):").pack(anchor="w", padx=padx, pady=(pady, 2))
-        self.post_var = tk.IntVar(value=self.settings.get("post_record_seconds", 3))
-        ttk.Spinbox(self.win, from_=1, to=30, textvariable=self.post_var, width=5).pack(anchor="w", padx=padx)
-
-        ttk.Label(self.win, text="Слова для поиска (каждое с новой строки):").pack(anchor="w", padx=padx, pady=(pady, 2))
-
-        self.words_text = tk.Text(self.win, height=12, width=50, bg="#2a2a3e", fg=fg, insertbackground=fg,
-                                  font=("Consolas", 9), relief="flat")
-        self.words_text.pack(fill="both", padx=padx, expand=True)
-        self.words_text.insert("1.0", "\n".join(self.settings.get("profanity_words", PROFANITY_WORDS)))
-
-        btn_frame = ttk.Frame(self.win)
-        btn_frame.pack(fill="x", padx=padx, pady=(pady, 16))
-
-        ttk.Button(btn_frame, text="Сохранить", style="Accent.TButton", command=self.save).pack(side="right", padx=(6, 0))
-        ttk.Button(btn_frame, text="Отмена", command=self.win.destroy).pack(side="right")
-
-    def browse_dir(self):
-        d = filedialog.askdirectory(title="Выберите папку для записей")
-        if d:
-            self.dir_var.set(d)
-
-    def save(self):
-        rec_dir = self.dir_var.get().strip()
-        if not rec_dir:
-            messagebox.showwarning("Внимание", "Укажите папку для записей.")
-            return
-
-        self.settings["recordings_dir"] = rec_dir
-        self.settings["post_record_seconds"] = self.post_var.get()
-        self.settings["profanity_words"] = [w.strip().lower() for w in self.words_text.get("1.0", "end-1c").split("\n") if w.strip()]
-        self.settings["setup_complete"] = True
-        self.result = self.settings
-        self.win.destroy()
-
-
-class SetupWizard:
-    def __init__(self, root):
-        self.result = None
-        self.win = tk.Toplevel(root)
-        self.win.title("VoiceMonitor — Настройка")
-        self.win.geometry("520x400")
-        self.win.resizable(False, False)
-        self.win.transient(root)
-        self.win.grab_set()
-
-        bg = "#1e1e2e"
-        fg = "#ffffff"
-        self.win.configure(bg=bg)
-
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TLabel", background=bg, foreground=fg, font=("Segoe UI", 10))
-        style.configure("TButton", font=("Segoe UI", 10), padding=(16, 6))
-        style.configure("Accent.TButton", background="#6c5ce7", foreground="white", font=("Segoe UI", 10, "bold"))
-        style.configure("Title.TLabel", background=bg, foreground="#a29bfe", font=("Segoe UI", 14, "bold"))
-        style.configure("Subtitle.TLabel", background=bg, foreground="#a0a0b0", font=("Segoe UI", 9))
-
-        ttk.Label(self.win, text="Добро пожаловать!", style="Title.TLabel").pack(anchor="w", padx=24, pady=(24, 4))
-        ttk.Label(self.win, text="Первый запуск VoiceMonitor. Выберите папку для записей:").pack(anchor="w", padx=24)
+        ttk.Label(self, text="Первый запуск — выберите папку", style="Title.TLabel").pack(pady=(20, 12))
 
         self.dir_var = tk.StringVar()
-        self.mode_var = tk.StringVar(value="default")
+        mode = tk.StringVar(value="default")
 
-        opts = [
+        def on_mode(*_):
+            if mode.get() == "custom":
+                f.pack(fill="x", padx=40, pady=4)
+            else:
+                f.pack_forget()
+
+        mode.trace_add("write", on_mode)
+
+        items = [
             ("default", "Рядом с программой (рекомендуется)"),
-            ("docs", "Документы \\ VoiceMonitor"),
-            ("desktop", "Рабочий стол \\ VoiceMonitor"),
-            ("custom", "Выбрать свою папку..."),
+            ("docs", "Мои документы"),
+            ("desktop", "Рабочий стол"),
+            ("custom", "Своя папка..."),
         ]
-        for val, txt in opts:
-            ttk.Radiobutton(self.win, text=txt, variable=self.mode_var, value=val).pack(anchor="w", padx=24, pady=2)
+        for val, txt in items:
+            ttk.Radiobutton(self, text=txt, variable=mode, value=val).pack(anchor="w", padx=24, pady=2)
 
-        self.custom_frame = ttk.Frame(self.win)
-        self.custom_frame.pack(fill="x", padx=48, pady=4)
-        ttk.Entry(self.custom_frame, textvariable=self.dir_var, width=30).pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ttk.Button(self.custom_frame, text="...", command=self.browse).pack(side="right")
-        self.custom_frame.pack_forget()
+        f = ttk.Frame(self)
+        ttk.Entry(f, textvariable=self.dir_var, width=35).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(f, text="...", command=self.browse).pack(side="right")
 
-        self.mode_var.trace_add("write", self._on_mode)
+        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=24, pady=12)
 
-        ttk.Separator(self.win, orient="horizontal").pack(fill="x", padx=24, pady=12)
-
-        btn_f = ttk.Frame(self.win)
-        btn_f.pack(fill="x", padx=24)
-        ttk.Button(btn_f, text="Сохранить и начать", style="Accent.TButton", command=self.apply).pack(side="right")
-
-        ttk.Label(self.win, text="Настройки можно изменить позже через кнопку ⚙", style="Subtitle.TLabel").pack(anchor="w", padx=24, pady=(6, 16))
-
-    def _on_mode(self, *args):
-        if self.mode_var.get() == "custom":
-            self.custom_frame.pack(fill="x", padx=48, pady=4)
-        else:
-            self.custom_frame.pack_forget()
+        ttk.Button(self, text="Начать", style="Accent.TButton",
+                   command=lambda: self.apply(mode.get())).pack(pady=(4, 8))
 
     def browse(self):
         d = filedialog.askdirectory()
         if d:
             self.dir_var.set(d)
 
-    def apply(self):
-        mode = self.mode_var.get()
-        base = os.path.dirname(os.path.abspath(__file__))
+    def apply(self, mode):
+        base = get_base()
         if mode == "default":
             path = os.path.join(base, "recordings")
         elif mode == "docs":
@@ -217,395 +133,416 @@ class SetupWizard:
                 messagebox.showwarning("Внимание", "Выберите папку.")
                 return
 
-        try:
-            os.makedirs(path, exist_ok=True)
-        except Exception as e:
-            messagebox.showerror("Ошибка", str(e))
-            return
-
+        os.makedirs(path, exist_ok=True)
         self.result = {
-            "recordings_dir": path,
-            "profanity_words": PROFANITY_WORDS,
-            "post_record_seconds": 3,
-            "setup_complete": True,
+            "rec_dir": path,
+            "words": list(DEFAULT_WORDS),
+            "post_sec": 3,
         }
         save_settings(self.result)
-        messagebox.showinfo("Готово", f"Записи: {path}")
-        self.win.destroy()
+        self.destroy()
 
 
-class VoiceMonitorApp:
+class DownloadDialog(tk.Toplevel):
+    def __init__(self, parent, model_dir):
+        super().__init__(parent)
+        self.title("Скачивание модели")
+        self.geometry("420x220")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.done = False
+
+        bg = "#1a1a2e"
+        self.configure(bg=bg)
+
+        ttk.Label(self, text="Модель не найдена", foreground="#a29bfe",
+                  background=bg, font=("Segoe UI", 11, "bold")).pack(pady=(18, 6))
+        ttk.Label(self, text="Нужно скачать модель (~50 MB) один раз",
+                  foreground="#a0a0b0", background=bg).pack()
+
+        self.progress = ttk.Progressbar(self, mode="determinate", length=320)
+        self.progress.pack(pady=14)
+
+        self.status = ttk.Label(self, text="", foreground="#a0a0b0", background=bg)
+        self.status.pack()
+
+        self.btn = tk.Button(self, text="Скачать", bg="#6c5ce7", fg="white",
+                             relief="flat", font=("Segoe UI", 10, "bold"), cursor="hand2",
+                             padx=16, pady=6, command=self.start_download)
+        self.btn.pack(pady=(8, 4))
+
+        self.model_dir = model_dir
+
+    def start_download(self):
+        self.btn.config(state="disabled", text="Скачивание...")
+        t = threading.Thread(target=self._download, daemon=True)
+        t.start()
+
+    def _download(self):
+        tmp = os.path.join(get_base(), "_tmp_model.zip")
+        try:
+            def hook(n, bs, ts):
+                if ts > 0:
+                    pct = min(100, n * bs * 100 // ts)
+                    self.after(0, lambda: (self.progress.configure(value=pct),
+                                           self.status.config(text=f"Скачивание: {pct}%")))
+
+            urllib.request.urlretrieve(MODEL_URL, tmp, reporthook=hook)
+            self.after(0, lambda: self.status.config(text="Распаковка..."))
+
+            os.makedirs(self.model_dir, exist_ok=True)
+            with zipfile.ZipFile(tmp) as z:
+                z.extractall(self.model_dir)
+            os.remove(tmp)
+
+            inner = os.path.join(self.model_dir, "vosk-model-small-ru-0.22")
+            if os.path.isdir(inner):
+                for name in os.listdir(inner):
+                    src = os.path.join(inner, name)
+                    dst = os.path.join(self.model_dir, name)
+                    if os.path.exists(dst):
+                        if os.path.isdir(dst):
+                            shutil.rmtree(dst)
+                        else:
+                            os.remove(dst)
+                    shutil.move(src, dst)
+                os.rmdir(inner)
+
+            self.after(0, lambda: (self.status.config(text="Готово!", foreground="#28a745"),
+                                   self.btn.config(text="OK", state="normal", command=self._close)))
+            self.done = True
+        except Exception as e:
+            msg = str(e)[:100]
+            self.after(0, lambda: (self.status.config(text=f"Ошибка: {msg}", foreground="#dc3545"),
+                                   self.btn.config(text="Повторить", state="normal", command=self.start_download)))
+
+    def _close(self):
+        self.destroy()
+
+
+class App(tk.Tk):
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("VoiceMonitor — Контроль речи")
-        self.root.geometry("880x580")
-        self.root.minsize(700, 450)
-
-        bg = "#1e1e2e"
-        accent = "#6c5ce7"
-        light = "#a29bfe"
-        self.root.configure(bg=bg)
+        super().__init__()
+        self.title("VoiceMonitor — Контроль речи")
+        self.geometry("900x580")
+        self.minsize(720, 420)
+        self.configure(bg="#1a1a2e")
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Treeview", background="#2a2a3e", foreground="#ffffff", fieldbackground="#2a2a3e",
-                        borderwidth=0, font=("Segoe UI", 9))
-        style.configure("Treeview.Heading", background="#3a3a4e", foreground=light,
+
+        bg = "#1a1a2e"
+        accent = "#6c5ce7"
+        light = "#a29bfe"
+        green = "#28a745"
+        red = "#dc3545"
+
+        style.configure("Treeview", background="#22223a", foreground="#ffffff",
+                        fieldbackground="#22223a", borderwidth=0, font=("Segoe UI", 9))
+        style.configure("Treeview.Heading", background="#2d2d44", foreground=light,
                         font=("Segoe UI", 9, "bold"), borderwidth=0)
-        style.map("Treeview.Heading", background=[("active", "#4a4a5e")])
-        style.map("Treeview", background=[("selected", accent)])
-        style.configure("TButton", padding=(12, 4))
+        style.map("Treeview.Heading", background=[("active", "#3d3d55")])
         style.configure("TFrame", background=bg)
         style.configure("TLabel", background=bg, foreground="#ffffff")
 
+        # Загрузка настроек
         self.settings = load_settings()
-        self.running = False
-        self.monitor_thread = None
-        self.model = None
-        self.recognizer = None
-        self.wave_in = None
-        self.audio_buffer = []
-        self.is_post_recording = False
-        self.post_chunks = 0
-        self.detection_time = None
-        self.detection_text = ""
-
-        self._check_setup()
-        self._build_ui()
-        self._load_model()
-        self._load_log()
-
-    def _check_setup(self):
-        if not self.settings.get("setup_complete"):
-            wizard = SetupWizard(self.root)
-            self.root.wait_window(wizard.win)
-            if wizard.result:
-                self.settings = wizard.result
+        if not self.settings:
+            self.withdraw()
+            dlg = SetupWindow(self)
+            self.wait_window(dlg)
+            if dlg.result:
+                self.settings = dlg.result
             else:
-                self.root.quit()
-                exit(0)
+                self.quit()
+                return
 
-        rec_dir = self.settings.get("recordings_dir", "")
-        if rec_dir:
-            os.makedirs(rec_dir, exist_ok=True)
+        self.rec_dir = get_rec_dir(self.settings)
+        self.words = self.settings.get("words", DEFAULT_WORDS)
+        self.post_sec = self.settings.get("post_sec", 3)
 
-    def _build_ui(self):
-        top = tk.Frame(self.root, bg="#2d2d44", height=50)
-        top.pack(fill="x", padx=0, pady=0)
-        top.pack_propagate(False)
+        # Кнопки
+        toolbar = ttk.Frame(self)
+        toolbar.pack(fill="x", padx=8, pady=6)
 
-        self.btn_start = tk.Button(top, text="▶  Старт", bg="#28a745", fg="white", relief="flat",
-                                   font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=6,
-                                   command=self.start_monitoring)
-        self.btn_start.pack(side="left", padx=(12, 6), pady=10)
+        self.btn_start = tk.Button(toolbar, text="▶  Старт", bg=green, fg="white",
+                                   relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                                   padx=12, pady=5, command=self.start)
+        self.btn_start.pack(side="left", padx=(4, 4))
 
-        self.btn_stop = tk.Button(top, text="■  Стоп", bg="#dc3545", fg="white", relief="flat",
-                                  font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=6,
-                                  state="disabled", command=self.stop_monitoring)
-        self.btn_stop.pack(side="left", padx=6, pady=10)
+        self.btn_stop = tk.Button(toolbar, text="■  Стоп", bg=red, fg="white",
+                                  relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                                  padx=12, pady=5, state="disabled", command=self.stop)
+        self.btn_stop.pack(side="left", padx=4)
 
-        tk.Button(top, text="⚙  Настройки", bg="#6c5ce7", fg="white", relief="flat",
-                  font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=6,
-                  command=self.show_settings).pack(side="left", padx=6, pady=10)
+        tk.Button(toolbar, text="⚙  Настройки", bg=accent, fg="white",
+                  relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                  padx=12, pady=5, command=self.show_settings).pack(side="left", padx=4)
 
-        tk.Button(top, text="📂  Папка", bg="#6c5ce7", fg="white", relief="flat",
-                  font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=6,
-                  command=self.open_folder).pack(side="left", padx=6, pady=10)
+        tk.Button(toolbar, text="📂  Папка", bg=accent, fg="white",
+                  relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                  padx=12, pady=5, command=self.open_folder).pack(side="left", padx=4)
 
-        tk.Button(top, text="🗑  Очистить", bg="#6c5ce7", fg="white", relief="flat",
-                  font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=6,
-                  command=self.clear_log).pack(side="left", padx=6, pady=10)
+        tk.Button(toolbar, text="🗑  Очистить", bg=accent, fg="white",
+                  relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                  padx=12, pady=5, command=self.clear_log).pack(side="left", padx=4)
 
-        tree_frame = tk.Frame(self.root, bg="#1e1e2e")
-        tree_frame.pack(fill="both", expand=True, padx=12, pady=12)
+        # Таблица
+        frame = ttk.Frame(self)
+        frame.pack(fill="both", expand=True, padx=8, pady=4)
 
-        columns = ("date", "time", "text", "file")
-        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
-
+        self.tree = ttk.Treeview(frame, columns=("date", "time", "text", "file"), show="headings")
         self.tree.heading("date", text="Дата")
         self.tree.heading("time", text="Время")
         self.tree.heading("text", text="Распознанный текст")
         self.tree.heading("file", text="Файл")
-
         self.tree.column("date", width=85, anchor="center")
         self.tree.column("time", width=75, anchor="center")
         self.tree.column("text", width=340)
         self.tree.column("file", width=200)
 
-        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
-
         self.tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
 
-        self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<Double-1>", self._open_file)
 
-        self.status_bar = tk.Frame(self.root, bg="#1e1e2e", height=28)
-        self.status_bar.pack(fill="x", side="bottom")
-        self.status_label = tk.Label(self.status_bar, text="Готово", bg="#1e1e2e", fg="#a29bfe", font=("Segoe UI", 9))
-        self.status_label.pack(side="left", padx=12)
+        # Статус
+        sf = ttk.Frame(self)
+        sf.pack(fill="x")
+        self.status_lbl = tk.Label(sf, text="Загрузка модели...", bg=bg, fg=light, font=("Segoe UI", 9))
+        self.status_lbl.pack(side="left", padx=12, pady=4)
 
-    def _load_model(self):
-        model_dir = get_model_dir()
-        if os.path.exists(model_dir) and len(os.listdir(model_dir)) > 3:
-            try:
-                self.model = Model(model_dir)
-                self.recognizer = KaldiRecognizer(self.model, 16000)
-                self.recognizer.SetWords(True)
-                self.status_label.config(text="Модель загружена. Нажмите «Старт».", fg="#28a745")
-                return
-            except Exception as e:
-                self.status_label.config(text=f"Ошибка модели: {e}", fg="#dc3545")
+        # Модель
+        self.after(100, self._ensure_model)
 
-        self._show_download_dialog(model_dir)
+    def _ensure_model(self):
+        md = get_model_dir()
+        if os.path.isdir(md) and len(os.listdir(md)) > 5:
+            self._load_model(md)
+        else:
+            dlg = DownloadDialog(self, md)
+            self.wait_window(dlg)
+            if dlg.done:
+                self._load_model(md)
+            else:
+                self.status_lbl.config(text="Модель не установлена")
 
-    def _show_download_dialog(self, model_dir):
-        dlg = tk.Toplevel(self.root)
-        dlg.title("Скачать модель")
-        dlg.geometry("420x280")
-        dlg.resizable(False, False)
-        dlg.transient(self.root)
-        dlg.grab_set()
-        dlg.configure(bg="#1e1e2e")
+    def _load_model(self, md):
+        try:
+            from vosk import Model, KaldiRecognizer
+            self.vosk_model = Model(md)
+            self.recognizer = KaldiRecognizer(self.vosk_model, 16000)
+            self.recognizer.SetWords(True)
+            self.status_lbl.config(text="Готово — нажмите «Старт»", fg="#28a745")
+            self._load_log()
+        except Exception as e:
+            self.status_lbl.config(text=f"Ошибка модели: {e}", fg="#dc3545")
 
-        ttk.Label(dlg, text="Модель распознавания речи не найдена",
-                  font=("Segoe UI", 11, "bold"), foreground="#a29bfe",
-                  background="#1e1e2e").pack(pady=(24, 8))
-
-        ttk.Label(dlg, text="Требуется скачать модель (~50 MB).\nЭто нужно сделать один раз.",
-                  foreground="#a0a0b0", background="#1e1e2e",
-                  justify="center").pack(pady=(0, 16))
-
-        progress = ttk.Progressbar(dlg, mode="determinate", length=320)
-        progress.pack(pady=8)
-
-        status_lbl = ttk.Label(dlg, text="", foreground="#a0a0b0", background="#1e1e2e")
-        status_lbl.pack()
-
-        def do_download():
-            btn.config(state="disabled")
-            url = "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"
-            zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_model_temp.zip")
-
-            try:
-                def report(block, total, size):
-                    if total > 0:
-                        pct = int(block * size * 100 / total)
-                        self.root.after(0, lambda: (progress.configure(value=pct), status_lbl.config(text=f"Скачивание: {pct}%")))
-
-                urllib.request.urlretrieve(url, zip_path, reporthook=report)
-                self.root.after(0, lambda: status_lbl.config(text="Распаковка..."))
-
-                os.makedirs(model_dir, exist_ok=True)
-                with zipfile.ZipFile(zip_path, 'r') as z:
-                    z.extractall(model_dir)
-                os.remove(zip_path)
-
-                inner = os.path.join(model_dir, "vosk-model-small-ru-0.22")
-                if os.path.exists(inner):
-                    for f in os.listdir(inner):
-                        src = os.path.join(inner, f)
-                        dst = os.path.join(model_dir, f)
-                        if os.path.exists(dst):
-                            if os.path.isdir(dst):
-                                import shutil
-                                shutil.rmtree(dst)
-                            else:
-                                os.remove(dst)
-                        if os.path.isdir(src):
-                            import shutil
-                            shutil.move(src, dst)
-                        else:
-                            os.rename(src, dst)
-                    os.rmdir(inner)
-
-                self.root.after(0, lambda: status_lbl.config(text="✓ Модель установлена!", foreground="#28a745"))
-                self.root.after(500, lambda: (dlg.destroy(), self._load_model()))
-            except Exception as e:
-                self.root.after(0, lambda: (status_lbl.config(text=f"✗ Ошибка: {str(e)[:80]}", foreground="#dc3545"), btn.config(state="normal")))
-
-        btn = tk.Button(dlg, text="Скачать модель", bg="#6c5ce7", fg="white", relief="flat",
-                        font=("Segoe UI", 10, "bold"), cursor="hand2", padx=20, pady=8,
-                        command=lambda: threading.Thread(target=do_download, daemon=True).start())
-        btn.pack(pady=(16, 8))
-
-        ttk.Label(dlg, text="Или скачайте вручную и распакуйте в models/",
-                  foreground="#666666", background="#1e1e2e",
-                  font=("Segoe UI", 8)).pack()
-
-    def start_monitoring(self):
-        if not self.model:
+    def start(self):
+        if not hasattr(self, "vosk_model"):
             messagebox.showwarning("Ошибка", "Модель не загружена.")
             return
         self.running = True
         self.btn_start.config(state="disabled")
         self.btn_stop.config(state="normal")
-        self.status_label.config(text="● Мониторинг активен", fg="#28a745")
-        self.audio_buffer = []
-        self.is_post_recording = False
-        self.post_chunks = 0
+        self.status_lbl.config(text="● Слушаю...", fg="#28a745")
 
-        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self.monitor_thread.start()
+        self.audio = []
+        self.posting = False
+        self.post_n = 0
+        self.det_time = None
+        self.det_text = ""
 
-    def stop_monitoring(self):
+        t = threading.Thread(target=self._loop, daemon=True)
+        t.start()
+
+    def stop(self):
         self.running = False
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
-        self.status_label.config(text="Готово", fg="#a29bfe")
+        self.status_lbl.config(text="Готово", fg="#a29bfe")
 
-    def _monitor_loop(self):
-        pa = PyAudio()
-        chunk_size = 3200
-        post_total = self.settings.get("post_record_seconds", 3) * 5
-
+    def _loop(self):
         try:
-            stream = pa.open(format=paInt16, channels=1, rate=16000, input=True,
-                             frames_per_buffer=chunk_size)
+            from pyaudio import PyAudio, paInt16
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Ошибка", str(e)))
+            self.after(0, lambda: messagebox.showerror("Ошибка", f"PyAudio: {e}"))
+            self.after(0, self.stop)
             return
+
+        pa = PyAudio()
+        try:
+            stream = pa.open(format=paInt16, channels=1, rate=16000,
+                             input=True, frames_per_buffer=3200)
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Ошибка", f"Микрофон: {e}"))
+            self.after(0, self.stop)
+            return
+
+        post_total = self.post_sec * 5
 
         try:
             while self.running:
                 try:
-                    data = stream.read(chunk_size, exception_on_overflow=False)
+                    data = stream.read(3200, exception_on_overflow=False)
                 except Exception:
                     continue
 
-                self.audio_buffer.append(data)
+                self.audio.append(data)
 
                 if self.recognizer.AcceptWaveform(data):
-                    result = json.loads(self.recognizer.Result())
-                    text = result.get("text", "")
-                    if text:
-                        is_prof, found = self._check_profanity(text)
-                        if is_prof:
-                            self.detection_time = datetime.now()
-                            self.detection_text = f"{text} [{found}]"
-                            self.is_post_recording = True
-                            self.post_chunks = 0
-                            continue
+                    import json as _j
+                    res = _j.loads(self.recognizer.Result())
+                    text = res.get("text", "")
+                    if text and has_profane(text, self.words):
+                        self.det_time = datetime.now()
+                        self.det_text = text
+                        self.posting = True
+                        self.post_n = 0
+                        continue
 
-                if self.is_post_recording:
-                    self.post_chunks += 1
-                    if self.post_chunks >= post_total:
-                        self._save_recording()
-                        self.is_post_recording = False
-                        self.post_chunks = 0
-                        self.audio_buffer = []
-
+                if self.posting:
+                    self.post_n += 1
+                    if self.post_n >= post_total:
+                        self.after(0, self._save)
+                        self.posting = False
+                        self.post_n = 0
+                        self.audio = []
         finally:
             stream.stop_stream()
             stream.close()
             pa.terminate()
 
-    def _check_profanity(self, text):
-        is_prof, found = detect_profanity(text)
-        if is_prof:
-            return True, found
-        words = self.settings.get("profanity_words", PROFANITY_WORDS)
-        for w in words:
-            if w in text.lower():
-                return True, w
-        return False, ""
-
-    def _save_recording(self):
+    def _save(self):
         try:
-            ts = self.detection_time.strftime("%Y-%m-%d_%H-%M-%S")
-            filename = f"detect_{ts}.wav"
-            rec_dir = self.settings.get("recordings_dir", "")
-            filepath = os.path.join(rec_dir, filename)
+            ts = self.det_time.strftime("%Y-%m-%d_%H-%M-%S")
+            fn = f"detect_{ts}.wav"
+            fp = os.path.join(self.rec_dir, fn)
+            raw = b"".join(self.audio)
+            with wave.open(fp, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(16000)
+                w.writeframes(raw)
 
-            audio_data = b"".join(self.audio_buffer)
-            with wave.open(filepath, "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(16000)
-                wf.writeframes(audio_data)
-
-            log_path = os.path.join(rec_dir, f"detections_{datetime.now().strftime('%Y-%m')}.json")
+            month = self.det_time.strftime("%Y-%m")
+            lp = os.path.join(self.rec_dir, f"detections_{month}.json")
             entries = []
-            if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8") as f:
+            if os.path.exists(lp):
+                with open(lp, "r", encoding="utf-8") as f:
                     entries = json.load(f)
 
             entry = {
-                "date": self.detection_time.strftime("%d.%m.%Y"),
-                "time": self.detection_time.strftime("%H:%M:%S"),
-                "text": self.detection_text,
-                "file": filename,
+                "date": self.det_time.strftime("%d.%m.%Y"),
+                "time": self.det_time.strftime("%H:%M:%S"),
+                "text": self.det_text,
+                "file": fn,
             }
             entries.append(entry)
-            with open(log_path, "w", encoding="utf-8") as f:
+            with open(lp, "w", encoding="utf-8") as f:
                 json.dump(entries, f, indent=2, ensure_ascii=False)
 
-            self.root.after(0, lambda: self.tree.insert("", 0, values=(entry["date"], entry["time"], entry["text"], entry["file"])))
-            self.root.after(0, lambda: self.status_label.config(text=f"Детекция: {entry['time']} — {entry['text'][:50]}"))
+            self.tree.insert("", 0, values=(entry["date"], entry["time"], entry["text"], entry["file"]))
+            self.status_lbl.config(text=f"Детекция: {entry['time']}")
 
+            self.audio = []
         except Exception as e:
-            print(f"Save error: {e}")
+            print("Save error:", e)
 
     def _load_log(self):
-        rec_dir = self.settings.get("recordings_dir", "")
-        if not os.path.exists(rec_dir):
-            return
-        import glob
-        logs = sorted(glob.glob(os.path.join(rec_dir, "detections_*.json")), reverse=True)[:10]
-        for log_path in logs:
+        self.tree.delete(*self.tree.get_children())
+        logs = sorted(glob.glob(os.path.join(self.rec_dir, "detections_*.json")), reverse=True)[:10]
+        for lp in logs:
             try:
-                with open(log_path, "r", encoding="utf-8") as f:
+                with open(lp, "r", encoding="utf-8") as f:
                     entries = json.load(f)
-                for entry in reversed(entries):
-                    self.tree.insert("", 0, values=(entry["date"], entry["time"], entry["text"], entry["file"]))
+                for e in reversed(entries):
+                    self.tree.insert("", 0, values=(e["date"], e["time"], e["text"], e["file"]))
             except Exception:
                 pass
 
     def show_settings(self):
-        dlg = SettingsDialog(self.root, self.settings)
-        self.root.wait_window(dlg.win)
-        if dlg.result:
-            self.settings = dlg.result
+        w = tk.Toplevel(self)
+        w.title("Настройки")
+        w.geometry("460x480")
+        w.resizable(False, False)
+        w.transient(self)
+        w.grab_set()
+
+        bg = "#1a1a2e"
+        w.configure(bg=bg)
+
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("TLabel", background=bg, foreground="#ffffff")
+        style.configure("TButton", padding=(14, 5))
+        style.configure("Accent.TButton", background="#6c5ce7", foreground="#ffffff")
+
+        ttk.Label(w, text="Папка записей:", foreground="#a29bfe").pack(anchor="w", padx=16, pady=(14, 4))
+
+        dv = tk.StringVar(value=self.rec_dir)
+        fr = ttk.Frame(w)
+        fr.pack(fill="x", padx=16)
+        ttk.Entry(fr, textvariable=dv, width=35).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(fr, text="...", command=lambda: dv.set(filedialog.askdirectory())).pack(side="right")
+
+        ttk.Label(w, text="Пост-запись (сек):", foreground="#a29bfe").pack(anchor="w", padx=16, pady=(12, 4))
+        pv = tk.IntVar(value=self.post_sec)
+        ttk.Spinbox(w, from_=1, to=30, textvariable=pv, width=5).pack(anchor="w", padx=16)
+
+        ttk.Label(w, text="Слова для поиска:", foreground="#a29bfe").pack(anchor="w", padx=16, pady=(12, 4))
+        tw = tk.Text(w, height=14, bg="#22223a", fg="#ffffff", insertbackground="#ffffff",
+                     font=("Consolas", 9), relief="flat")
+        tw.pack(fill="both", padx=16, pady=(0, 12), expand=True)
+        tw.insert("1.0", "\n".join(self.words))
+
+        def save():
+            d = dv.get().strip()
+            if not d:
+                messagebox.showwarning("Внимание", "Укажите папку.")
+                return
+            self.settings["rec_dir"] = d
+            self.settings["post_sec"] = pv.get()
+            self.settings["words"] = [x.strip().lower() for x in tw.get("1.0", "end-1c").split("\n") if x.strip()]
+            self.rec_dir = get_rec_dir(self.settings)
+            self.words = self.settings["words"]
+            self.post_sec = self.settings["post_sec"]
             save_settings(self.settings)
-            rec_dir = self.settings.get("recordings_dir", "")
-            if rec_dir:
-                os.makedirs(rec_dir, exist_ok=True)
+            w.destroy()
+
+        fr2 = ttk.Frame(w)
+        fr2.pack(fill="x", padx=16)
+        ttk.Button(fr2, text="Сохранить", style="Accent.TButton", command=save).pack(side="right", padx=(6, 0))
+        ttk.Button(fr2, text="Закрыть", command=w.destroy).pack(side="right")
 
     def open_folder(self):
-        rec_dir = self.settings.get("recordings_dir", "")
-        if os.path.exists(rec_dir):
-            os.startfile(rec_dir)
+        if os.path.exists(self.rec_dir):
+            os.startfile(self.rec_dir)
 
     def clear_log(self):
-        if messagebox.askyesno("Очистить", "Удалить все записи?"):
-            rec_dir = self.settings.get("recordings_dir", "")
-            if os.path.exists(rec_dir):
-                import glob
-                for f in glob.glob(os.path.join(rec_dir, "detections_*.json")):
-                    os.remove(f)
-                for f in glob.glob(os.path.join(rec_dir, "detect_*.wav")):
-                    os.remove(f)
-            for item in self.tree.get_children():
-                self.tree.delete(item)
-            self.status_label.config(text="Журнал очищен")
+        if messagebox.askyesno("Очистить", "Удалить все записи и логи?"):
+            for f in glob.glob(os.path.join(self.rec_dir, "detections_*.json")):
+                os.remove(f)
+            for f in glob.glob(os.path.join(self.rec_dir, "detect_*.wav")):
+                os.remove(f)
+            self.tree.delete(*self.tree.get_children())
+            self.status_lbl.config(text="Журнал очищен")
 
-    def on_double_click(self, event):
-        item = self.tree.selection()
-        if not item:
+    def _open_file(self, event):
+        sel = self.tree.selection()
+        if not sel:
             return
-        values = self.tree.item(item[0], "values")
-        if len(values) < 4:
+        vals = self.tree.item(sel[0], "values")
+        if len(vals) < 4:
             return
-        filename = values[3]
-        rec_dir = self.settings.get("recordings_dir", "")
-        filepath = os.path.join(rec_dir, filename)
-        if os.path.exists(filepath):
-            os.startfile(filepath)
-
-    def run(self):
-        self.root.mainloop()
+        fp = os.path.join(self.rec_dir, vals[3])
+        if os.path.exists(fp):
+            os.startfile(fp)
 
 
 if __name__ == "__main__":
-    app = VoiceMonitorApp()
-    app.run()
+    app = App()
+    app.mainloop()
