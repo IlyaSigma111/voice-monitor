@@ -15,10 +15,16 @@ from vosk import Model, KaldiRecognizer
 import config
 from profanity_list import PROFANITY_WORDS
 from profanity_detector import detect_profanity
+from setup_wizard import is_setup_complete, run_setup, get_recordings_dir
 
 
 class VoiceMonitor:
     def __init__(self):
+        if not is_setup_complete():
+            run_setup()
+            if not is_setup_complete():
+                sys.exit(0)
+
         self.running = False
         self.model = None
         self.recognizer = None
@@ -29,7 +35,7 @@ class VoiceMonitor:
         self.record_lock = threading.Lock()
         self.post_record_chunks = 0
         self.pending_detection = None
-        self.recordings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), config.RECORDINGS_DIR)
+        self.recordings_dir = get_recordings_dir()
         os.makedirs(self.recordings_dir, exist_ok=True)
 
         self._setup_logging()
