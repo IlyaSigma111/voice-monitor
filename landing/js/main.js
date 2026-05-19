@@ -144,27 +144,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Download button interaction
+    // Download button - just track click analytics (optional)
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
-        downloadBtn.addEventListener('click', (e) => {
-            e.preventDefault();
+        downloadBtn.addEventListener('click', () => {
             downloadBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" class="spin">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
                 </svg>
-                Подготовка...
+                Открываем релиз...
             `;
+            downloadBtn.style.background = 'linear-gradient(135deg, #28c840 0%, #20a035 100%)';
             setTimeout(() => {
                 downloadBtn.innerHTML = `
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    Ссылка появится в релизах!
+                    Скачать VoiceMonitor.exe
                 `;
-                downloadBtn.style.background = 'linear-gradient(135deg, #28c840 0%, #20a035 100%)';
-            }, 1500);
+                downloadBtn.style.background = '';
+            }, 2000);
         });
     }
 
