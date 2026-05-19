@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Monitor — Контроль речи в классе</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-1"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+                VoiceMonitor
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features">Возможности</a></li>
+                <li><a href="#how-it-works">Как работает</a></li>
+                <li><a href="#settings">Настройки</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#download">Скачать</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="hero" id="hero">
+        <div class="parallax-layer parallax-bg" data-speed="0.2"></div>
+        <div class="parallax-layer parallax-circles" data-speed="0.4">
+            <div class="floating-circle circle-1"></div>
+            <div class="floating-circle circle-2"></div>
+            <div class="floating-circle circle-3"></div>
+            <div class="floating-circle circle-4"></div>
+            <div class="floating-circle circle-5"></div>
+        </div>
+        <div class="parallax-layer parallax-grid" data-speed="0.15"></div>
+        <div class="hero-content" data-speed="0.6">
+            <span class="badge">Офлайн • Без нагрузки на ПК • Windows</span>
+            <h1>Контроль речи<br>в реальном времени</h1>
+            <p class="hero-desc">Фоновое приложение, которое распознаёт нецензурную лексику и автоматически сохраняет аудиофрагменты. Работает без интернета, не нагружает компьютер.</p>
+            <div class="hero-buttons">
+                <a href="#download" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Скачать бесплатно
+                </a>
+                <a href="#how-it-works" class="btn btn-secondary">Как это работает</a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number" data-target="50">0</span>
+                    <span class="stat-label">MB модель</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" data-target="0">0</span>
+                    <span class="stat-label">нужен интернет</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" data-target="24">0</span>
+                    <span class="stat-label">/7 мониторинг</span>
+                </div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <div class="mouse">
+                <div class="wheel"></div>
+            </div>
+            <span>Листайте вниз</span>
+        </div>
+    </section>
+
+    <section class="section features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Преимущества</span>
+                <h2>Почему VoiceMonitor?</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                    </div>
+                    <h3>Фоновая работа</h3>
+                    <p>Работает скрытно в системном трее. Ученики не заметят. Минимальное потребление ресурсов.</p>
+                </div>
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>
+                        </svg>
+                    </div>
+                    <h3>Полностью офлайн</h3>
+                    <p>Не требует интернета. Все данные остаются на компьютере. Приватность и безопасность.</p>
+                </div>
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                    </div>
+                    <h3>Умное распознавание</h3>
+                    <p>Распознаёт коверканные слова, замены букв и сленг. Продвинутый алгоритм fuzzy matching.</p>
+                </div>
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </div>
+                    <h3>Настраиваемый</h3>
+                    <p>Добавляйте свои слова. Меняйте чувствительность. Гибкая настройка под ваши нужды.</p>
+                </div>
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                    </div>
+                    <h3>Подробный лог</h3>
+                    <p>Каждое событие записывается с датой, временем и распознанным текстом. Удобный журнал.</p>
+                </div>
+                <div class="feature-card" data-tilt>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </div>
+                    <h3>Для слабых ПК</h3>
+                    <p>Работает даже на старых компьютерах. ~50 MB RAM, минимальная нагрузка на CPU.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section parallax-section how-it-works" id="how-it-works">
+        <div class="parallax-overlay"></div>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Принцип работы</span>
+                <h2>Как это работает</h2>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">01</div>
+                    <div class="step-content">
+                        <h3>Захват аудио</h3>
+                        <p>Программа слушает микрофон в реальном времени. Аудиопоток обрабатывается чанками по 200мс для минимальной нагрузки.</p>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step">
+                    <div class="step-number">02</div>
+                    <div class="step-content">
+                        <h3>Распознавание речи</h3>
+                        <p>Движок Vosk на базе Kaldi транскрибирует речь в текст. Лёгкая модель small-ru (~50 MB) работает полностью локально.</p>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step">
+                    <div class="step-number">03</div>
+                    <div class="step-content">
+                        <h3>Детекция мата</h3>
+                        <p>Продвинутый анализ: нормализация текста, fuzzy matching, проверка корней слов. Распознаёт даже коверканные слова.</p>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step">
+                    <div class="step-number">04</div>
+                    <div class="step-content">
+                        <h3>Сохранение</h3>
+                        <p>При обнаружении аудиофрагмент сохраняется в папку recordings с меткой времени. Лог детекций ведётся автоматически.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section settings" id="settings">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Конфигурация</span>
+                <h2>Гибкие настройки</h2>
+                <p class="section-subtitle">Настройте приложение под свои задачи через простые конфигурационные файлы.</p>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-card">
+                    <div class="setting-header">
+                        <span class="setting-file">config.py</span>
+                    </div>
+                    <div class="setting-items">
+                        <div class="setting-item">
+                            <code>BUFFER_SECONDS</code>
+                            <span>Сколько секунд аудио хранить в буфере до обнаружения</span>
+                        </div>
+                        <div class="setting-item">
+                            <code>POST_RECORD_SECONDS</code>
+                            <span>Запись дополнительных секунд после детекции</span>
+                        </div>
+                        <div class="setting-item">
+                            <code>SAMPLE_RATE</code>
+                            <span>Частота дискретизации аудио (по умолчанию 16000)</span>
+                        </div>
+                        <div class="setting-item">
+                            <code>RECORDINGS_DIR</code>
+                            <span>Папка для сохранения записей</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-card">
+                    <div class="setting-header">
+                        <span class="setting-file">profanity_list.py</span>
+                    </div>
+                    <div class="setting-items">
+                        <div class="setting-item">
+                            <code>PROFANITY_WORDS</code>
+                            <span>Список ключевых слов для детекции. Добавляйте, удаляйте, модифицируйте по необходимости.</span>
+                        </div>
+                        <div class="setting-item">
+                            <code>profanity_detector.py</code>
+                            <span>Продвинутый анализ с нормализацией, fuzzy matching и проверкой корней слов</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-code">
+                <div class="code-window">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
+                        </div>
+                        <span class="code-filename">config.py</span>
+                    </div>
+                    <div class="code-body">
+                        <pre><code><span class="code-comment"># Параметры аудио</span>
+<span class="code-var">SAMPLE_RATE</span> = <span class="code-num">16000</span>
+<span class="code-var">CHANNELS</span> = <span class="code-num">1</span>
+<span class="code-var">CHUNK_DURATION</span> = <span class="code-num">0.2</span>  <span class="code-comment"># секунд на один чанк</span>
+<span class="code-var">BUFFER_SECONDS</span> = <span class="code-num">5</span>    <span class="code-comment"># секунд в буфере до детекции</span>
+<span class="code-var">POST_RECORD_SECONDS</span> = <span class="code-num">3</span>  <span class="code-comment"># секунд после детекции</span>
+
+<span class="code-comment"># Путь к модели Vosk</span>
+<span class="code-var">VOSK_MODEL_PATH</span> = <span class="code-string">"models/vosk-model-small-ru"</span></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section faq" id="faq">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Вопросы</span>
+                <h2>Часто задаваемые вопросы</h2>
+            </div>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Требуется ли интернет для работы?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Нет. VoiceMonitor работает полностью офлайн. Модель распознавания речи загружается локально, а вся обработка происходит на вашем компьютере.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Какая нагрузка на систему?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Приложение потребляет около 50 MB RAM и минимально нагружает CPU. Модель small-ru весит всего ~50 MB и оптимизирована для работы на слабых ПК.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Как установить свою модель?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Скачайте модель с <a href="https://alphacephei.com/vosk/models/" target="_blank">официального сайта Vosk</a>. Распакуйте архив в папку <code>models/</code>. По умолчанию используется <code>vosk-model-small-ru</code>.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Как добавить свои слова для детекции?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Откройте файл <code>profanity_list.py</code> и добавьте нужные слова в список <code>PROFANITY_WORDS</code>. Для продвинутой детекции с нечётким поиском редактируйте <code>profanity_detector.py</code>.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Где хранятся записанные фрагменты?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Все записи сохраняются в папку <code>recordings/</code> в формате WAV. Каждый файл содержит аудиофрагмент с меткой времени. Также ведётся лог детекций в формате <code>detections_YYYY-MM.log</code>.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Можно ли собрать в .exe?</span>
+                        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Да. Запустите <code>build.bat</code> и получите готовый <code>VoiceMonitor.exe</code> в папке <code>dist/</code>. Требуется установленный Python с зависимостями.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section code-preview" id="code-preview">
+        <div class="container">
+            <div class="code-preview-grid">
+                <div class="code-text">
+                    <span class="section-tag">Архитектура</span>
+                    <h2>Простая установка,<br>мощная начинка</h2>
+                    <ul class="tech-list">
+                        <li>
+                            <span class="tech-icon">🎤</span>
+                            <div>
+                                <strong>PyAudio</strong>
+                                <p>Захват аудиопотока с микрофона</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="tech-icon">🧠</span>
+                            <div>
+                                <strong>Vosk (Kaldi)</strong>
+                                <p>Офлайн распознавание русского языка</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="tech-icon">🔍</span>
+                            <div>
+                                <strong>Fuzzy Matching</strong>
+                                <p>Нечёткий поиск для коверканных слов</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="tech-icon">📦</span>
+                            <div>
+                                <strong>PyInstaller</strong>
+                                <p>Сборка в один .exe файл</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="code-window">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
+                        </div>
+                        <span class="code-filename">profanity_detector.py</span>
+                    </div>
+                    <div class="code-body">
+                        <pre><code><span class="code-comment"># Нечёткое сопоставление для коверканных слов</span>
+<span class="code-keyword">def</span> <span class="code-func">normalize_text</span>(text):
+    <span class="code-comment"># Заменяем похожие символы</span>
+    mapping = {
+        <span class="code-string">'@'</span>: <span class="code-string">'а'</span>, <span class="code-string">'0'</span>: <span class="code-string">'о'</span>,
+        <span class="code-string">'$'</span>: <span class="code-string">'с'</span>, <span class="code-string">'3'</span>: <span class="code-string">'е'</span>,
+        <span class="code-string">'*'</span>: <span class="code-string">'а'</span>, <span class="code-string">'#'</span>: <span class="code-string">'х'</span>,
+    }
+    <span class="code-keyword">for</span> k, v <span class="code-keyword">in</span> mapping.items():
+        text = text.replace(k, v)
+    <span class="code-keyword">return</span> text
+
+<span class="code-keyword">def</span> <span class="code-func">detect_profanity</span>(text):
+    text = normalize_text(text.lower())
+    words = text.split()
+    <span class="code-keyword">for</span> word <span class="code-keyword">in</span> words:
+        <span class="code-keyword">for</span> root <span class="code-keyword">in</span> <span class="code-var">ROOTS</span>:
+            <span class="code-keyword">if</span> Levenshtein.ratio(word, root) > <span class="code-num">0.7</span>:
+                <span class="code-keyword">return</span> <span class="code-bool">True</span>
+    <span class="code-keyword">return</span> <span class="code-bool">False</span></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section download" id="download">
+        <div class="container">
+            <div class="download-card">
+                <div class="download-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <h2>Скачать VoiceMonitor</h2>
+                <p>Бесплатно. Без регистрации. Один .exe файл.</p>
+                <div class="download-info">
+                    <span class="info-item">Windows 10/11</span>
+                    <span class="info-item">~80 MB</span>
+                    <span class="info-item">v1.0.0</span>
+                </div>
+                <a href="#" class="btn btn-primary btn-large" id="download-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Скачать VoiceMonitor.exe
+                </a>
+                <div class="download-note">
+                    <p>После установки просто запустите файл. Программа появится в трее.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-1"/>
+                    </svg>
+                    VoiceMonitor
+                </div>
+                <p class="footer-text">Создано для учителей. Защищайте свой класс от нецензурной лексики.</p>
+                <div class="footer-links">
+                    <a href="https://github.com" target="_blank">GitHub</a>
+                    <a href="#" target="_blank">Документация</a>
+                    <a href="#" target="_blank">Обратная связь</a>
+                </div>
+                <p class="footer-copy">© 2026 VoiceMonitor. Open Source.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

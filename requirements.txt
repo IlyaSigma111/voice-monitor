@@ -1,0 +1,5 @@
+pyaudio==0.2.14
+vosk==0.3.45
+pystray==0.19.5
+Pillow==10.2.0
+python-Levenshtein==0.25.1
