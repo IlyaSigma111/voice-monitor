@@ -21,6 +21,7 @@ DEFAULT_WORDS = [
 
 SETTINGS_FILE = "vm_settings.json"
 MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"
+MUSIC_DIR = "music"
 
 
 def get_base():
@@ -261,6 +262,13 @@ class App(tk.Tk):
         self.rec_dir = get_rec_dir(self.settings)
         self.words = self.settings.get("words", DEFAULT_WORDS)
         self.post_sec = self.settings.get("post_sec", 3)
+        self.music_volume = self.settings.get("music_volume", 0.7)
+        self.music_dir = os.path.join(get_base(), MUSIC_DIR)
+        os.makedirs(self.music_dir, exist_ok=True)
+        self.music_tracks = self._scan_music()
+        self.current_track = None
+        self.music_playing = False
+        self.music_thread = None
 
         # Кнопки
         toolbar = ttk.Frame(self)
@@ -275,6 +283,32 @@ class App(tk.Tk):
                                   relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
                                   padx=12, pady=5, state="disabled", command=self.stop)
         self.btn_stop.pack(side="left", padx=4)
+
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
+
+        # Музыка
+        music_frame = ttk.Frame(toolbar)
+        music_frame.pack(side="left", padx=4)
+
+        ttk.Label(music_frame, text="Музыка:", foreground=light).pack(side="left", padx=(0, 4))
+
+        self.music_var = tk.StringVar(value="Нет треков")
+        self.music_combo = ttk.Combobox(music_frame, textvariable=self.music_var, width=20, state="readonly")
+        if self.music_tracks:
+            self.music_combo["values"] = self.music_tracks
+            self.music_combo.current(0)
+        self.music_combo.pack(side="left", padx=2)
+
+        self.btn_music_play = tk.Button(music_frame, text="▶", bg=green, fg="white",
+                                        relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                                        width=3, command=self.music_toggle)
+        self.btn_music_play.pack(side="left", padx=2)
+
+        tk.Button(music_frame, text="📂", bg=accent, fg="white",
+                  relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
+                  width=3, command=self.open_music_folder).pack(side="left", padx=2)
+
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
 
         tk.Button(toolbar, text="⚙  Настройки", bg=accent, fg="white",
                   relief="flat", font=("Segoe UI", 9, "bold"), cursor="hand2",
@@ -364,6 +398,61 @@ class App(tk.Tk):
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
         self.status_lbl.config(text="Готово", fg="#a29bfe")
+
+    def _scan_music(self):
+        tracks = []
+        for ext in (".mp3", ".wav", ".ogg", ".flac", ".m4a"):
+            tracks.extend(glob.glob(os.path.join(self.music_dir, f"*{ext}")))
+        return [os.path.basename(t) for t in sorted(tracks)]
+
+    def music_toggle(self):
+        if not self.music_tracks:
+            messagebox.showinfo("Музыка", f"Добавьте mp3/wav файлы в папку:\n{self.music_dir}")
+            return
+        if self.music_playing:
+            self.music_stop()
+        else:
+            self.music_play()
+
+    def music_play(self):
+        selected = self.music_var.get()
+        if selected not in self.music_tracks:
+            return
+        self.current_track = selected
+        self.music_playing = True
+        self.btn_music_play.config(text="⏸", bg="#ffc107")
+        t = threading.Thread(target=self._music_loop, daemon=True)
+        t.start()
+
+    def music_stop(self):
+        self.music_playing = False
+        self.btn_music_play.config(text="▶", bg="#28a745")
+
+    def _music_loop(self):
+        try:
+            import pygame
+        except ImportError:
+            self.after(0, lambda: messagebox.showerror("Ошибка", "Установите pygame: pip install pygame"))
+            self.after(0, self.music_stop)
+            return
+
+        pygame.mixer.init()
+        track_path = os.path.join(self.music_dir, self.current_track)
+
+        while self.music_playing:
+            try:
+                pygame.mixer.music.load(track_path)
+                pygame.mixer.music.set_volume(self.music_volume)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy() and self.music_playing:
+                    pygame.time.wait(200)
+            except Exception as e:
+                self.after(0, lambda: self.status_lbl.config(text=f"Ошибка музыки: {e}", fg="#dc3545"))
+                break
+
+    def open_music_folder(self):
+        os.makedirs(self.music_dir, exist_ok=True)
+        os.startfile(self.music_dir)
 
     def _loop(self):
         try:
@@ -467,7 +556,7 @@ class App(tk.Tk):
     def show_settings(self):
         w = tk.Toplevel(self)
         w.title("Настройки")
-        w.geometry("460x480")
+        w.geometry("460x520")
         w.resizable(False, False)
         w.transient(self)
         w.grab_set()
@@ -493,8 +582,14 @@ class App(tk.Tk):
         pv = tk.IntVar(value=self.post_sec)
         ttk.Spinbox(w, from_=1, to=30, textvariable=pv, width=5).pack(anchor="w", padx=16)
 
+        ttk.Label(w, text="Громкость музыки:", foreground="#a29bfe").pack(anchor="w", padx=16, pady=(12, 4))
+        vv = tk.DoubleVar(value=self.music_volume)
+        scale = tk.Scale(w, from_=0, to=1, resolution=0.1, orient="horizontal",
+                         variable=vv, bg=bg, fg="#ffffff", highlightthickness=0)
+        scale.pack(fill="x", padx=16)
+
         ttk.Label(w, text="Слова для поиска:", foreground="#a29bfe").pack(anchor="w", padx=16, pady=(12, 4))
-        tw = tk.Text(w, height=14, bg="#22223a", fg="#ffffff", insertbackground="#ffffff",
+        tw = tk.Text(w, height=10, bg="#22223a", fg="#ffffff", insertbackground="#ffffff",
                      font=("Consolas", 9), relief="flat")
         tw.pack(fill="both", padx=16, pady=(0, 12), expand=True)
         tw.insert("1.0", "\n".join(self.words))
@@ -506,6 +601,8 @@ class App(tk.Tk):
                 return
             self.settings["rec_dir"] = d
             self.settings["post_sec"] = pv.get()
+            self.settings["music_volume"] = vv.get()
+            self.music_volume = vv.get()
             self.settings["words"] = [x.strip().lower() for x in tw.get("1.0", "end-1c").split("\n") if x.strip()]
             self.rec_dir = get_rec_dir(self.settings)
             self.words = self.settings["words"]

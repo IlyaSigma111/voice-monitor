@@ -59,7 +59,7 @@ if %errorlevel% neq 0 (
 echo  [2/3] Установка зависимостей...
 echo.
 python -m pip install --upgrade pip -q 2>nul
-python -m pip install pyaudio vosk pystray Pillow python-Levenshtein -q 2>nul
+python -m pip install pyaudio vosk pystray Pillow python-Levenshtein pygame -q 2>nul
 
 if %errorlevel% neq 0 (
     echo.
